@@ -1,6 +1,6 @@
 // アプリ本体だけをキャッシュしてオフラインでも開けるようにする（GitHub API は常にネットワーク）
-const CACHE = 'tap-diary-v3';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'tap-diary-v4';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(
