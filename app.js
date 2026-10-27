@@ -73,12 +73,13 @@ const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const parseYen = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
 const sum = (arr, f = x => x.amount) => arr.reduce((a, x) => a + f(x), 0);
 
-// 外食の金額は「食費・外食」の支出として自動で数える（手入力の二重計上を防ぐため保存はせず毎回導出）
+// 食事に入れた金額は（自炊・外食とも）「食費・外食」の支出として自動で数える（手入力の二重計上を防ぐため保存はせず毎回導出）
 function allExpenses(e) {
-  const fromMeals = MEALS.filter(([k]) => e.meals?.[k]?.out && e.meals[k].amount > 0).map(([k, l]) => ({
-    amount: e.meals[k].amount, category: '食費・外食', source: 'meal',
-    memo: `${l}の外食${e.meals[k].text ? '：' + e.meals[k].text : ''}`,
-  }));
+  const fromMeals = MEALS.filter(([k]) => e.meals?.[k]?.amount > 0).map(([k, l]) => {
+    const m = e.meals[k];
+    const kind = m.out ? '外食' : m.out === false ? '自炊' : '食事';
+    return { amount: m.amount, category: '食費・外食', source: 'meal', memo: `${l}の${kind}${m.text ? '：' + m.text : ''}` };
+  });
   return [...(e.expenses || []), ...fromMeals];
 }
 
@@ -102,12 +103,12 @@ function toMarkdown(e) {
   for (const ev of e.events) {
     lines.push(`- ${ev.allDay ? '終日' : ev.start || ''} ${ev.title}${ev.reaction ? ' ' + rx[ev.reaction] : ''}${ev.note ? ' — ' + ev.note : ''}`.replace(/^- +/, '- '));
   }
-  const meals = MEALS.filter(([k]) => e.meals?.[k] && (e.meals[k].text || e.meals[k].out != null));
+  const meals = MEALS.filter(([k]) => e.meals?.[k] && (e.meals[k].text || e.meals[k].out != null || e.meals[k].amount));
   if (meals.length) {
     lines.push('', '## 食事');
     for (const [k, l] of meals) {
       const m = e.meals[k];
-      const kind = m.out ? `外食${m.amount ? ' ' + yen(m.amount) : ''}` : m.out === false ? '自炊' : '';
+      const kind = [m.out ? '外食' : m.out === false ? '自炊' : '', m.amount ? yen(m.amount) : ''].filter(Boolean).join(' ');
       lines.push(`- ${l}${kind ? `（${kind}）` : ''}: ${m.text || ''}`.trimEnd());
     }
   }
@@ -252,7 +253,7 @@ function mealsHTML() {
       </div>
       <div class="meal-inputs">
         <input data-meal-text="${k}" value="${esc(m.text)}" placeholder="何を食べた？">
-        ${m.out ? `<input class="amount" data-meal-amount="${k}" value="${m.amount || ''}" inputmode="numeric" placeholder="円">` : ''}
+        <input class="amount" data-meal-amount="${k}" value="${m.amount || ''}" inputmode="numeric" placeholder="円">
       </div>
     </div>`;
   }).join('')}</section>`;
@@ -535,11 +536,13 @@ view.addEventListener('input', (ev) => {
   else if (t.dataset.mealText) {
     (entry.meals[t.dataset.mealText] ||= { text: '', out: null, amount: 0 }).text = t.value; persist();
   }
-  else if (t.dataset.mealAmount) { entry.meals[t.dataset.mealAmount].amount = parseYen(t.value); persist(); }
+  else if (t.dataset.mealAmount) {
+    (entry.meals[t.dataset.mealAmount] ||= { text: '', out: null, amount: 0 }).amount = parseYen(t.value); persist();
+  }
   else if (t.id === 'money-amount') moneyDraft.amount = t.value;
   else if (t.id === 'money-memo') moneyDraft.memo = t.value;
 });
-// 外食の金額を入れ終えたら、お金カードの合計に反映する
+// 食事の金額を入れ終えたら、お金カードの合計に反映する
 view.addEventListener('change', (ev) => { if (ev.target.dataset.mealAmount) render(); });
 view.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Enter' || ev.isComposing) return;
