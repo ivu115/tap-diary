@@ -9,17 +9,22 @@ const BK_FILTERS = [['all', 'すべて'], ['left', '残りだけ'], ['lifelong',
 let bkMaster = bkLoadLocal('bucket:items');
 let bkState = bkLoadLocal('bucket:state');
 let bkFilter = 'all';
+let bkView = 'list';          // list: やりたいこと100 / yearly: 年ごとの目標
+let bkYear = new Date().getFullYear();
+let bkYearEdit = null;        // 編集中の年間目標の id
 let bkForm = null; // 追加・編集フォームの中身 {id?, text, category, type}
 let bkPushTimer = null;
 let bkPulling = null;
 let bkError = null; // 読み込みに失敗したときに画面に出す理由
+let bkSyncError = null; // 直近の保存に失敗した理由（成功したら消す）
+let bkSyncing = false;
 
 function bkLoadLocal(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
 }
 // 初期状態はマスタの state（93番の達成）をそのまま引き継ぐ
 function bkInitState(master) {
-  return { done: JSON.parse(JSON.stringify(master.state || {})), addedItems: [], nextId: 101, updatedAt: null, syncedAt: null };
+  return { done: JSON.parse(JSON.stringify(master.state || {})), addedItems: [], nextId: 101, yearly: {}, updatedAt: null, syncedAt: null };
 }
 function bkSaveLocal() { localStorage.setItem('bucket:state', JSON.stringify(bkState)); }
 function bkPersist() {
@@ -68,6 +73,8 @@ function bkSchedulePush(delay = 1500) {
 }
 async function bkPush() {
   const { syncedAt, ...data } = bkState;
+  bkSyncing = true;
+  if (tab === 'bucket') renderStatus();
   try {
     const cur = await getFile(BK_STATE_PATH);
     const body = { message: 'bucketlist: 更新', content: b64(JSON.stringify(data, null, 2) + '\n'), branch: settings.branch };
@@ -76,8 +83,23 @@ async function bkPush() {
     if (res.status === 404) throw new Error('リポジトリが見つかりません（設定を確認）');
     bkState.syncedAt = data.updatedAt;
     bkSaveLocal();
-    if (tab === 'bucket') renderStatus();
-  } catch (err) { toast('やりたいことの同期に失敗: ' + err.message); }
+    bkSyncError = null;
+  } catch (err) {
+    bkSyncError = err.message || String(err);
+    toast('やりたいことの同期に失敗: ' + bkSyncError);
+  }
+  bkSyncing = false;
+  if (tab === 'bucket') renderStatus();
+}
+
+function bkRenderStatus(s) {
+  s.className = 'status';
+  if (!bkState) { s.textContent = ''; return; }
+  if (bkSyncing) s.textContent = '同期中…';
+  else if (bkSyncError) { s.textContent = '✕ 同期失敗: ' + bkSyncError.slice(0, 60); s.className = 'status warn'; }
+  else if (bkUnsynced()) { s.textContent = '● 未同期の変更あり'; s.className = 'status warn'; }
+  else if (bkState.syncedAt) s.textContent = '✓ GitHubに同期済み';
+  else s.textContent = '';
 }
 
 // ---------- 描画 ----------
@@ -92,28 +114,39 @@ function bucketHTML() {
     if (!bkPulling) bkLoadAndRender();
     return '<p class="empty center-pad">読み込み中…</p>';
   }
+  const views = `<div class="seg wide bk-views">
+      <button data-bk-view="list" class="${bkView === 'list' ? 'on' : ''}">やりたいこと100</button>
+      <button data-bk-view="yearly" class="${bkView === 'yearly' ? 'on' : ''}">年ごとの目標</button>
+    </div>`;
+  return views + (bkView === 'yearly' ? bkYearlyHTML() : bkListHTML());
+}
+
+const bkShortDate = d => d ? d.slice(5).replace('-', '/') : '';
+
+function bkListHTML() {
   const items = bkItems();
   const normal = items.filter(x => x.type === 'normal');
   const doneCount = normal.filter(x => bkDone(x.id)).length;
-  const lifelong = items.filter(x => x.type === 'lifelong');
-  const visible = items.filter(x =>
-    bkFilter === 'all' || (bkFilter === 'lifelong' ? x.type === 'lifelong' : x.type === 'normal' && !bkDone(x.id)));
+  const lifelong = items.filter(x => x.type === 'lifelong').sort((a, b) => a.id - b.id);
 
   const row = x => {
     const life = x.type === 'lifelong';
     const done = !life && bkDone(x.id);
-    const doneAt = done && bkState.done[x.id].doneAt;
-    const body = `<span class="bk-num">${x.id}</span><span class="bk-text">${esc(x.text)}</span>` +
-      (life ? '<span class="bk-badge">一生もの</span>' : done ? `<span class="bk-check">✓${doneAt ? ' ' + doneAt.slice(5).replace('-', '/') : ''}</span>` : '<span class="bk-box"></span>');
+    // 一生ものは別のまとまりに出すので、バッジの代わりにカテゴリを小さく添える
+    const body = `<span class="bk-num">${x.id}</span><span class="bk-text">${esc(x.text)}${life ? `<small class="bk-cat">${x.category}</small>` : ''}</span>` +
+      (life ? '' : done ? `<span class="bk-check">✓ ${bkShortDate(bkState.done[x.id].doneAt)}</span>` : '<span class="bk-box"></span>');
     return `<div class="bk-row${life ? ' lifelong' : ''}${done ? ' done' : ''}">
       ${life ? `<div class="bk-main">${body}</div>` : `<button class="bk-main" data-bk-toggle="${x.id}" aria-pressed="${done}">${body}</button>`}
       ${x.added ? `<button class="bk-edit" data-bk-edit="${x.id}" aria-label="編集">✎</button>` : ''}
     </div>`;
   };
-  const sections = BK_CATS.map(cat => {
-    const list = visible.filter(x => x.category === cat).sort((a, b) => a.id - b.id);
+  // 通常の項目はカテゴリ別、一生ものはカテゴリをまたいで1つにまとめる
+  const normalSections = bkFilter === 'lifelong' ? '' : BK_CATS.map(cat => {
+    const list = normal.filter(x => x.category === cat && (bkFilter === 'all' || !bkDone(x.id))).sort((a, b) => a.id - b.id);
     return list.length ? `<section class="card bk-section"><h2>${cat} <span class="h2-sub">${list.length}個</span></h2>${list.map(row).join('')}</section>` : '';
   }).join('');
+  const lifeSection = bkFilter === 'left' || !lifelong.length ? '' :
+    `<section class="card bk-section bk-life-section"><h2><span>🌱 一生もの</span> <span class="h2-sub">${lifelong.length}個・打ち消さずに大切にし続けること</span></h2>${lifelong.map(row).join('')}</section>`;
 
   return `
     <section class="card bk-head">
@@ -123,7 +156,42 @@ function bucketHTML() {
     </section>
     <div class="seg wide bk-filter">${BK_FILTERS.map(([k, l]) => `<button data-bk-filter="${k}" class="${bkFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${bkForm ? bkFormHTML() : '<button class="bk-add" data-bk-act="new">＋ 追加</button>'}
-    ${sections || `<p class="empty center-pad">${bkFilter === 'left' ? '残りはありません。全部達成！' : '表示する項目がありません'}</p>`}`;
+    ${normalSections + lifeSection || `<p class="empty center-pad">${bkFilter === 'left' ? '残りはありません。全部達成！' : '表示する項目がありません'}</p>`}`;
+}
+
+// 年ごとの目標：100個とは別に、その年にやりたいことを自由に書いて達成を記録する
+function bkYearlyHTML() {
+  const list = (bkState.yearly || {})[bkYear] || [];
+  const done = list.filter(x => x.done).length;
+  const thisYear = new Date().getFullYear();
+  const items = list.map(x => x.id === bkYearEdit
+    ? `<div class="bk-row editing">
+        <input id="bk-year-edit" class="bk-year-input" value="${esc(x.text)}">
+        <button class="bk-edit" data-bk-year-save="${x.id}">保存</button>
+        <button class="bk-edit bk-del" data-bk-year-del="${x.id}">削除</button>
+      </div>`
+    : `<div class="bk-row${x.done ? ' done' : ''}">
+        <button class="bk-main" data-bk-year-toggle="${x.id}" aria-pressed="${!!x.done}">
+          <span class="bk-text">${esc(x.text)}</span>
+          ${x.done ? `<span class="bk-check">✓ ${bkShortDate(x.doneAt)}</span>` : '<span class="bk-box"></span>'}
+        </button>
+        <button class="bk-edit" data-bk-year-edit="${x.id}" aria-label="編集">✎</button>
+      </div>`).join('');
+  return `
+    <section class="card bk-head">
+      <div class="bk-year-nav">
+        <button class="nav-btn" data-bk-year="-1" aria-label="前の年">‹</button>
+        <div class="bk-year">${bkYear}年${bkYear === thisYear ? '<small>今年</small>' : ''}</div>
+        <button class="nav-btn" data-bk-year="1" aria-label="次の年">›</button>
+      </div>
+      ${list.length ? `<div class="bk-left">残り<b>${list.length - done}</b>個</div>
+        <div class="meter"><div class="meter-fill" style="width:${done / list.length * 100}%"></div></div>
+        <div class="bk-sub"><span>達成 ${done} / ${list.length}</span></div>` : ''}
+    </section>
+    <section class="card">
+      <div class="add-row"><input id="bk-year-new" placeholder="${bkYear}年にやりたいこと"><button data-bk-act="year-add">追加</button></div>
+      ${items || `<p class="empty" style="margin-top:12px">${bkYear}年の目標はまだありません</p>`}
+    </section>`;
 }
 
 function bkFormHTML() {
@@ -158,6 +226,37 @@ view.addEventListener('click', (ev) => {
     bkPersist(); render();
   }
   else if (d.bkFilter) { bkFilter = d.bkFilter; render(); }
+  else if (d.bkView) { bkView = d.bkView; bkForm = null; bkYearEdit = null; render(); }
+  else if (d.bkYear) { bkYear += +d.bkYear; bkYearEdit = null; render(); }
+  else if (d.bkAct === 'year-add') {
+    const input = document.getElementById('bk-year-new');
+    const text = input.value.trim();
+    if (!text) { toast('やりたいことを入力してください'); return; }
+    const yearly = bkState.yearly || (bkState.yearly = {});
+    (yearly[bkYear] || (yearly[bkYear] = [])).push({ id: 'y' + Date.now(), text, done: false, addedAt: dateStr(new Date()) });
+    bkPersist(); render();
+    document.getElementById('bk-year-new')?.focus();
+  }
+  else if (d.bkYearToggle) {
+    const x = bkState.yearly[bkYear].find(x => x.id === d.bkYearToggle);
+    x.done = !x.done;
+    if (x.done) x.doneAt = dateStr(new Date()); else delete x.doneAt;
+    bkPersist(); render();
+  }
+  else if (d.bkYearEdit) { bkYearEdit = d.bkYearEdit; render(); document.getElementById('bk-year-edit')?.focus(); }
+  else if (d.bkYearSave) {
+    const text = document.getElementById('bk-year-edit').value.trim();
+    if (!text) { toast('やりたいことを入力してください'); return; }
+    bkState.yearly[bkYear].find(x => x.id === d.bkYearSave).text = text;
+    bkYearEdit = null; bkPersist(); render();
+  }
+  else if (d.bkYearDel) {
+    const x = bkState.yearly[bkYear].find(x => x.id === d.bkYearDel);
+    if (!confirm(`「${x.text}」を削除しますか？`)) return;
+    bkState.yearly[bkYear] = bkState.yearly[bkYear].filter(y => y.id !== d.bkYearDel);
+    if (!bkState.yearly[bkYear].length) delete bkState.yearly[bkYear];
+    bkYearEdit = null; bkPersist(); render();
+  }
   else if (d.bkAct === 'retry') { bkError = null; render(); }
   else if (d.bkEdit) {
     const x = bkState.addedItems.find(x => x.id === +d.bkEdit);
@@ -192,6 +291,11 @@ view.addEventListener('click', (ev) => {
 });
 view.addEventListener('input', (ev) => {
   if (tab === 'bucket' && ev.target.id === 'bk-text') bkForm.text = ev.target.value;
+});
+view.addEventListener('keydown', (ev) => {
+  if (tab !== 'bucket' || ev.key !== 'Enter' || ev.isComposing) return;
+  if (ev.target.id === 'bk-year-new') view.querySelector('[data-bk-act="year-add"]').click();
+  if (ev.target.id === 'bk-year-edit') view.querySelector('[data-bk-year-save]').click();
 });
 // フォームの選択だけ切り替える（入力中の文面を消さないよう全体は描き直さない）
 function bkSyncForm() {

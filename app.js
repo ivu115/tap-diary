@@ -221,6 +221,7 @@ function toast(msg) {
 
 function renderStatus() {
   const s = document.getElementById('status');
+  if (tab === 'bucket') { bkRenderStatus(s); return; }
   if (tab !== 'today') { s.textContent = ''; return; }
   if (!configured()) { s.textContent = '端末に保存（同期は設定から）'; s.className = 'status'; }
   else if (isUnsynced(entry)) { s.textContent = '● 未同期の変更あり'; s.className = 'status warn'; }

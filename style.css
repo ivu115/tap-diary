@@ -178,6 +178,18 @@ input.memo { width: 100%; }
 .bk-form-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
 .bk-form-actions .btn-sub { margin: 0; }
 .bk-del { color: var(--bad); }
+.bk-views { margin-bottom: 12px; }
+.bk-views button { font-weight: 700; }
+.bk-cat { display: block; font-size: 11px; color: var(--life); margin-top: 2px; }
+.bk-life-section { border-color: var(--life); background: var(--life-soft); }
+.bk-life-section h2 { flex-wrap: wrap; gap: 4px; }
+.bk-life-section h2 > span:first-child { color: var(--life); font-size: 15px; font-weight: 700; }
+.bk-life-section .bk-row.lifelong { background: var(--card); border-left-width: 1px; border-color: var(--line); }
+.bk-year-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.bk-year { font-size: 22px; font-weight: 700; }
+.bk-year small { font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+.bk-row.editing { padding: 6px; gap: 6px; align-items: center; }
+.bk-year-input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 16px; }
 .bk-error { font-size: 14px; color: var(--bad); word-break: break-all; margin: 0 0 12px; }
 
 .bk-row { display: flex; align-items: stretch; border-radius: 12px; margin-top: 6px; border: 1px solid var(--line); background: var(--bg); }
