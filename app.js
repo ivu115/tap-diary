@@ -1,5 +1,6 @@
 // タップ日記 — 端末に即保存し、GitHub の非公開リポジトリへ Markdown で同期する
 
+const APP_VERSION = '2026-11-17d';  // 公開するたびに sw.js の CACHE と一緒に上げる
 const SETTINGS_KEY = 'diary:settings';
 const DEFAULT_TAGS = ['仕事', '勉強', '運動', '人と会った', '外出', '趣味', '家族', '一人時間', '睡眠不足', '頭痛'];
 
@@ -426,7 +427,8 @@ function settingsHTML() {
       <h2>タグ</h2>
       <label>カンマ区切り<textarea id="s-tags" rows="3">${esc(settings.tags.join(', '))}</textarea></label>
     </section>
-    <button class="save" data-act="save-settings">設定を保存して接続テスト</button>`;
+    <button class="save" data-act="save-settings">設定を保存して接続テスト</button>
+    <p class="note center">アプリの版: ${APP_VERSION}</p>`;
 }
 
 // ---------- 操作 ----------
@@ -554,7 +556,21 @@ view.addEventListener('keydown', (ev) => {
 });
 
 window.addEventListener('online', syncPending);
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // 新しい版の sw.js が有効になったら1回だけ読み込み直す（ホーム画面のアプリが古い版のまま残らないように）
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+  // ホーム画面のアプリは閉じずに裏で残ることが多いので、表に戻ったときにも更新を確かめる
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') navigator.serviceWorker.getRegistration().then(r => r?.update()).catch(() => {});
+  });
+}
 
 openDate(current);
 syncPending();
