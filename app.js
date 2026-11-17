@@ -449,7 +449,7 @@ document.querySelectorAll('.tabbar button').forEach(b => b.onclick = () => {
   if (tab === 'today') entry = load(current);
   if (tab === 'money') summaryMonth = current.slice(0, 7);
   render(); window.scrollTo(0, 0);
-  if (tab === 'bucket') bkPull().then(() => tab === 'bucket' && render()).catch(err => toast(err.message));
+  if (tab === 'bucket') bkLoadAndRender();
 });
 
 view.addEventListener('click', async (ev) => {

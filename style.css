@@ -178,6 +178,7 @@ input.memo { width: 100%; }
 .bk-form-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
 .bk-form-actions .btn-sub { margin: 0; }
 .bk-del { color: var(--bad); }
+.bk-error { font-size: 14px; color: var(--bad); word-break: break-all; margin: 0 0 12px; }
 
 .bk-row { display: flex; align-items: stretch; border-radius: 12px; margin-top: 6px; border: 1px solid var(--line); background: var(--bg); }
 .bk-main {

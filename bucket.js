@@ -12,6 +12,7 @@ let bkFilter = 'all';
 let bkForm = null; // 追加・編集フォームの中身 {id?, text, category, type}
 let bkPushTimer = null;
 let bkPulling = null;
+let bkError = null; // 読み込みに失敗したときに画面に出す理由
 
 function bkLoadLocal(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
@@ -40,9 +41,10 @@ async function bkPull() {
   if (!configured()) return;
   if (bkPulling) return bkPulling;
   bkPulling = (async () => {
+    bkError = null;
     const [items, state] = await Promise.all([getFile(BK_ITEMS_PATH), getFile(BK_STATE_PATH)]);
     if (items) { bkMaster = JSON.parse(items.text); localStorage.setItem('bucket:items', items.text); }
-    if (!bkMaster) return;
+    if (!bkMaster) throw new Error(`${settings.owner}/${settings.repo} に ${BK_ITEMS_PATH} が見つかりません`);
     if (state) {
       const r = JSON.parse(state.text);
       if (!bkState || !bkState.updatedAt || (r.updatedAt && r.updatedAt > bkState.updatedAt)) {
@@ -52,8 +54,11 @@ async function bkPull() {
     }
     if (!bkState) { bkState = bkInitState(bkMaster); bkPersist(); }   // state.json がまだ無ければ作る
     else if (bkUnsynced()) bkSchedulePush(0);
-  })().finally(() => { bkPulling = null; });
+  })().catch(err => { bkError = err.message || String(err); }).finally(() => { bkPulling = null; });
   return bkPulling;
+}
+function bkLoadAndRender() {
+  bkPull().then(() => { if (tab === 'bucket') render(); });
 }
 
 function bkSchedulePush(delay = 1500) {
@@ -79,8 +84,13 @@ async function bkPush() {
 
 function bucketHTML() {
   if (!bkMaster || !bkState) {
-    if (configured()) bkPull().then(() => tab === 'bucket' && render()).catch(err => toast(err.message));
-    return `<p class="empty center-pad">${configured() ? '読み込み中…' : '設定タブで GitHub 同期をつなぐと、やりたいこと100個が表示されます'}</p>`;
+    if (!configured()) return '<p class="empty center-pad">設定タブで GitHub 同期をつなぐと、やりたいこと100個が表示されます</p>';
+    if (bkError) {
+      return `<section class="card"><h2>読み込めませんでした</h2><p class="bk-error">${esc(bkError)}</p>
+        <button class="bk-add" data-bk-act="retry">もう一度読み込む</button></section>`;
+    }
+    if (!bkPulling) bkLoadAndRender();
+    return '<p class="empty center-pad">読み込み中…</p>';
   }
   const items = bkItems();
   const normal = items.filter(x => x.type === 'normal');
@@ -148,6 +158,7 @@ view.addEventListener('click', (ev) => {
     bkPersist(); render();
   }
   else if (d.bkFilter) { bkFilter = d.bkFilter; render(); }
+  else if (d.bkAct === 'retry') { bkError = null; render(); }
   else if (d.bkEdit) {
     const x = bkState.addedItems.find(x => x.id === +d.bkEdit);
     bkForm = { ...x }; render(); window.scrollTo(0, 0);
