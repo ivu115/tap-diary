@@ -154,9 +154,49 @@ input.memo { width: 100%; }
 .bar-val { text-align: right; font-variant-numeric: tabular-nums; }
 .bar-val small { display: block; font-size: 11px; color: var(--muted); }
 
+/* やりたいこと100 */
+:root { --life: #7a6bc4; --life-soft: #efecfb; }
+@media (prefers-color-scheme: dark) { :root { --life: #b0a5ef; --life-soft: #2f2a45; } }
+.center-pad { text-align: center; padding: 32px 0; }
+.bk-head { text-align: center; }
+.bk-left { font-size: 18px; font-weight: 700; }
+.bk-left b { font-size: 56px; line-height: 1.1; color: var(--accent); margin: 0 4px; font-variant-numeric: tabular-nums; }
+.bk-head .meter { margin: 8px 0; }
+.bk-sub { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.bk-life-count { color: var(--life); font-weight: 600; }
+.bk-filter { margin-bottom: 12px; }
+.bk-add, .bk-save {
+  width: 100%; min-height: 48px; border-radius: 14px; border: 1px dashed var(--accent);
+  background: var(--card); color: var(--accent); font-weight: 700; margin-bottom: 12px;
+}
+.bk-save { border-style: solid; background: var(--accent); color: #fff; margin: 0; flex: 1; }
+.bk-form textarea {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; resize: vertical; margin-bottom: 10px;
+}
+.bk-type { margin-top: 10px; }
+.bk-form-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.bk-form-actions .btn-sub { margin: 0; }
+.bk-del { color: var(--bad); }
+
+.bk-row { display: flex; align-items: stretch; border-radius: 12px; margin-top: 6px; border: 1px solid var(--line); background: var(--bg); }
+.bk-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left;
+  border: 0; background: none; padding: 10px 12px; min-height: 48px;
+}
+.bk-num { min-width: 26px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bk-text { flex: 1; min-width: 0; }
+.bk-box { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--line); flex: none; }
+.bk-check { font-size: 12px; color: var(--good); font-weight: 700; white-space: nowrap; }
+.bk-row.done { opacity: .55; }
+.bk-row.done .bk-text { text-decoration: line-through; text-decoration-thickness: 2px; }
+.bk-row.lifelong { background: var(--life-soft); border-color: var(--life); border-left-width: 4px; }
+.bk-badge { font-size: 11px; font-weight: 700; color: #fff; background: var(--life); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.bk-edit { border: 0; background: none; color: var(--muted); font-size: 16px; padding: 0 12px; }
+
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--card); border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }

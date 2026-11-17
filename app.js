@@ -231,12 +231,13 @@ function renderStatus() {
 function render() {
   const [y, m] = summaryMonth.split('-').map(Number);
   document.getElementById('date-label').textContent =
-    { today: prettyDate(current), money: `${y}年${m}月の家計`, history: '履歴', settings: '設定' }[tab];
+    { today: prettyDate(current), money: `${y}年${m}月の家計`, bucket: 'やりたいこと100', history: '履歴', settings: '設定' }[tab];
   const arrows = tab === 'today' || tab === 'money' ? 'visible' : 'hidden';
   document.getElementById('prev').style.visibility = arrows;
   document.getElementById('next').style.visibility = arrows;
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  view.innerHTML = { today: todayHTML, money: summaryHTML, history: historyHTML, settings: settingsHTML }[tab]();
+  // bucketHTML は後から読み込む bucket.js にあるので、呼ぶときに参照する
+  view.innerHTML = { today: todayHTML, money: summaryHTML, bucket: () => bucketHTML(), history: historyHTML, settings: settingsHTML }[tab]();
   renderStatus();
 }
 
@@ -448,6 +449,7 @@ document.querySelectorAll('.tabbar button').forEach(b => b.onclick = () => {
   if (tab === 'today') entry = load(current);
   if (tab === 'money') summaryMonth = current.slice(0, 7);
   render(); window.scrollTo(0, 0);
+  if (tab === 'bucket') bkPull().then(() => tab === 'bucket' && render()).catch(err => toast(err.message));
 });
 
 view.addEventListener('click', async (ev) => {
